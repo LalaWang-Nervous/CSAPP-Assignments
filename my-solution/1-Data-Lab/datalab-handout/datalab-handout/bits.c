@@ -143,7 +143,11 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+  int m = (~x)&y;
+  int n = (~y)&x;
+  /*LalaWang's comment: 
+  return (m|n)*/
+  return ~((~m)&(~n));
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -152,9 +156,8 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
-
-  return 2;
-
+  /*LalaWang's comment: return 0x8000000 */
+  return 1<<31;
 }
 //2
 /*
@@ -165,6 +168,7 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
+  
   return 2;
 }
 /* 
@@ -176,7 +180,15 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  /*LalaWang's comment: construct 0xAAAAAAAA */
+  int base = 0xAA;  // 8 bits
+  int target = (base<<8) + base;
+  target = (target<<16) + target;
+  /*LalaWang's comment: 
+       if a number x, all odd-numbered bits in word set to 1
+       then x&(0xAAAAAAAA) should be equal to 0xAAAAAAAA
+  */
+  return !(target^(target&x));
 }
 /* 
  * negate - return -x 
@@ -209,7 +221,18 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  /*LalaWang's comment: 
+       if x = 0, flag = 0x00000000 (0)
+       else, flag = 0x11111111 (-1)
+  */
+  int isZero = !(!(x)); // isZero = 0 or 1
+  //LalaWang's comment:  construct 0x00000000 and 0x11111111
+  int flag = (isZero<<1) + isZero; // 2 bits
+  flag = (flag<<2) + flag; // 4 bits
+  flag = (flag<<4) + flag; // 8 bits
+  flag = (flag<<8) + flag; // 16 bits
+  flag = (flag<<16) + flag; // 32 bits
+  return (flag&y) | ((~flag)&z);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -231,7 +254,7 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
