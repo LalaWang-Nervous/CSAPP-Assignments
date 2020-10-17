@@ -168,8 +168,27 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
+  /*
+  LalaWang's comment: the overflow of signed integer is undefined, decided by 
+  specific complier, so here provides a solution that only works in some platforms,
+  but not works in dlc:
   
-  return 2;
+  int isTmax(int x) {
+    int y = x + 0x01; // should be 0x80000000
+    int z = y + y; // undefined
+    return !z & !!y;
+  }
+
+  */
+  
+  /*
+  LalaWang's comment: for the INT_MAX, INT_MAX + 1 = ~INT_MAX
+  but 0xFFFFFFFF has this property too, need to exclude it.
+  */
+  int notX = ~x;
+  int y = x + 1;
+  int isEqual = !(notX^y);
+  return isEqual&(!!y);
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -198,7 +217,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  return (~x)+1;
 }
 //3
 /* 
@@ -211,7 +230,29 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  /*LalaWang's comment:  
+        larger = x - 0x30, and smaller = 0x39 - x
+        they all should be >0
+  */
+  int larger = x + (~0x30) + 1;   
+  int smaller = 0x39 + (~x) + 1;
+  /*LalaWang's comment: construct 0x80000000 */
+  int target = 1<<31;
+  return !(target&larger) & !(target&smaller);
+  
+  /* LalaWang's comment: 
+   although the above solution works, such way is not recommended, 
+   because when calculate larger and smaller, do plus operation may cause overflow. 
+   Here is a better solution:
+       int isAsciiDigit(int x) {
+	// 0x30 = 0011 0000b   0x39 = 0011 1001b
+	int a = (x>>4) ^ 0x3;	// if the 5th and 6th bit is 1
+	int b0 = (x>>3) & 1;	// if the 4th bit is 1
+	int b1 = (x>>2) ^ 1;	// if the 3th bit is 1
+	int b2 = (x>>1) ^ 1;	// if the 2th bit is 1
+	return (!a) & ((!b0) | (b0&b1&b2)); // (5th and 6th bit is 1) AND ((4th bit is 0) OR (4th bit is 1，2th、3th bit is 0))
+       }
+  */
 }
 /* 
  * conditional - same as x ? y : z 
@@ -233,6 +274,11 @@ int conditional(int x, int y, int z) {
   flag = (flag<<8) + flag; // 16 bits
   flag = (flag<<16) + flag; // 32 bits
   return (flag&y) | ((~flag)&z);
+  
+  /*
+  LalaWang's comment: a better way to construct 0x00000000 or 0x11111111
+      flag = (isZero<<31)>>31;
+  */
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -242,7 +288,15 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  /*LalaWang's comment: construct 0x80000000 */
+  int target = 1<<31;
+  int z = !((x^y)&target); 
+  /*LalaWang's comment:
+      so if z=0, we only need to confirm that y should be the positive one;
+      if z=1, x,y has the same sign, and we can sure that y+(~x)+1 will not overflow. (THIS IS VERY IMPORTANT)
+      and here I use the Short-circuit calculation principle of Boolean operation, small tricky。
+  */
+  return ((!z)&(!(y&target))) | (z&(!((y+(~x)+1)&target)));
 }
 //4
 /* 
@@ -254,7 +308,11 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-
+   /*LalaWang's comment:
+      if x = 0, then -x = 0 = x.
+      for any other num, num != -num, so (num | (-num))'s most significant bit must be 1
+   */
+   return ((x|(~x+1))>>31)+1;
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
