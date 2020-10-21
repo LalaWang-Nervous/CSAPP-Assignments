@@ -327,7 +327,14 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+  /*LalaWang's comment:
+     for the positive num, we need to find the highest bit(nth, for example) that is 1, return (n+1)
+     for the negative num, we need to find the highest bit(nth, for example) that is 0, return (n+1)
+     because of that:
+        -2^m + 2^(m-1) + 2^(m-2) + ... + 2^(n+1) + 2^n = -2^n 
+  */
+  
+  return 2;
 }
 //float
 /* 
@@ -342,7 +349,18 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+  int sign = !!(uf&(1<<31)); //sign=0, positive; sign=1, negative
+  int exp = (uf&0x7f800000)>>23; //exp=0, unregular; exp=0x000000ff, NaN; else,regular
+  int frac = (uf&0x007fffff); //frac
+  
+  if(exp==0x000000ff){
+    return uf;
+  } 
+  else if(exp==0){
+    return (sign<<31) + (((exp<<23)+frac)<<1);
+  }
+  exp = exp + 1;
+  return (sign<<31) + (exp<<23) + frac;
 }
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
@@ -373,5 +391,11 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  if(x>=128){
+    return 0x7f800000;
+  }
+  else if(x<= -127){
+    return 0;
+  }
+  return (0<<31) + ((127 + x)<<23);
 }
