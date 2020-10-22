@@ -333,18 +333,18 @@ int howManyBits(int x) {
      because of that:
         -2^m + 2^(m-1) + 2^(m-2) + ... + 2^(n+1) + 2^n = -2^n 
   */
+  int f0,f1,f2,f3,f4;
   int sign = (x&(1<<31))>>31; /*if x>=0, sign=0; else, sign=-1*/
   x = (sign&(~x)) |((~sign)&x); /*if x>=0, x=x; else x=~x*/
-  
-  int f0 = !!((x>>16)^0); /*if f0=0, the higher 16 bits have no bit 1*/
+  f0 = !!((x>>16)^0); /*if f0=0, the higher 16 bits have no bit 1*/
   x = x>>(f0<<4);
-  int f1 = !!((x>>8)^0);
+  f1 = !!((x>>8)^0);
   x = x>>(f1<<3);
-  int f2 = !!((x>>4)^0);
+  f2 = !!((x>>4)^0);
   x = x>>(f2<<2);
-  int f3 = !!((x>>2)^0);
+  f3 = !!((x>>2)^0);
   x = x>>(f3<<1);
-  int f4 = !!((x>>1)^0);
+  f4 = !!((x>>1)^0);
   x = x>>(f4<<0);
   return (f0<<4)+(f1<<3)+(f2<<2)+(f3<<1)+f4+1+x;
 }
@@ -362,10 +362,10 @@ int howManyBits(int x) {
  */
 unsigned floatScale2(unsigned uf) {
   int sign = !!(uf&(1<<31)); //sign=0, positive; sign=1, negative
-  int exp = (uf&0x7f800000)>>23; //exp=0, unregular; exp=0x000000ff, NaN; else,regular
-  int frac = (uf&0x007fffff); //frac
+  int exp = (uf&((0xff)<<23))>>23; //(0xff)<<23 =0x7f800000; if exp=0, unregular; exp=0x000000ff, NaN; else,regular
+  int frac = (uf&(~((1<<31)>>8))); //0x007fffff (~((1<<31)>>8))
   
-  if(exp==0x000000ff){
+  if(exp==255){
     return uf;
   } 
   else if(exp==0){
@@ -387,28 +387,30 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
+  int E;
+  int res;
   int sign = !!(uf&(1<<31)); //sign=0, positive; sign=1, negative
-  int exp = (uf&0x7f800000)>>23; //exp=0, unregular; exp=0x000000ff, NaN; else,regular
-  int frac = (uf&0x007fffff); //frac
+  int exp = (uf&((0xff)<<23))>>23; //(0xff)<<23 =0x7f800000; if exp=0, unregular; exp=0x000000ff, NaN; else,regular
+  int frac = (uf&(~((1<<31)>>8))); //0x007fffff (~((1<<31)>>8))
   
   if(exp==0 || exp<127){ // to small
      return 0;
   }
-  if(exp==0x000000ff){ // NaN
+  if(exp==255){ // NaN
      return 0x80000000u;
   }
   if(exp>=158){ //overflow  or downflow
      return 0x80000000u;
   }
   
-  int E = exp - 127;
+  E = exp - 127;
   if(E>=23){
      frac = (frac<<(E-23));
   } else {
      frac = frac>>(23-E);
   }
   
-  int res = frac + (1<<E);
+  res = frac + (1<<E);
   if(sign==1){
      res = (~res)+1;
   }
@@ -429,7 +431,7 @@ int floatFloat2Int(unsigned uf) {
  */
 unsigned floatPower2(int x) {
   if(x>=128){
-    return 0x7f800000;
+    return (0xff)<<23;
   }
   else if(x<= -127){
     return 0;
