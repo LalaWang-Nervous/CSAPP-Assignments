@@ -333,8 +333,20 @@ int howManyBits(int x) {
      because of that:
         -2^m + 2^(m-1) + 2^(m-2) + ... + 2^(n+1) + 2^n = -2^n 
   */
+  int sign = (x&(1<<31))>>31; /*if x>=0, sign=0; else, sign=-1*/
+  x = (sign&(~x)) |((~sign)&x); /*if x>=0, x=x; else x=~x*/
   
-  return 2;
+  int f0 = !!((x>>16)^0); /*if f0=0, the higher 16 bits have no bit 1*/
+  x = x>>(f0<<4);
+  int f1 = !!((x>>8)^0);
+  x = x>>(f1<<3);
+  int f2 = !!((x>>4)^0);
+  x = x>>(f2<<2);
+  int f3 = !!((x>>2)^0);
+  x = x>>(f3<<1);
+  int f4 = !!((x>>1)^0);
+  x = x>>(f4<<0);
+  return (f0<<4)+(f1<<3)+(f2<<2)+(f3<<1)+f4+1+x;
 }
 //float
 /* 
@@ -375,7 +387,32 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  int sign = !!(uf&(1<<31)); //sign=0, positive; sign=1, negative
+  int exp = (uf&0x7f800000)>>23; //exp=0, unregular; exp=0x000000ff, NaN; else,regular
+  int frac = (uf&0x007fffff); //frac
+  
+  if(exp==0 || exp<127){ // to small
+     return 0;
+  }
+  if(exp==0x000000ff){ // NaN
+     return 0x80000000u;
+  }
+  if(exp>=158){ //overflow  or downflow
+     return 0x80000000u;
+  }
+  
+  int E = exp - 127;
+  if(E>=23){
+     frac = (frac<<(E-23));
+  } else {
+     frac = frac>>(23-E);
+  }
+  
+  int res = frac + (1<<E);
+  if(sign==1){
+     res = (~res)+1;
+  }
+  return res;
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
