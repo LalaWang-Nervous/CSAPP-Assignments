@@ -9,4 +9,16 @@ bomb3(eight answers, choose any one):
 			5 206
 			6 682
 			7 327
-bomb4: 0 0
+bomb4(four answers, choose any one): 
+			0 0
+			1 0
+			3 0
+			7 0
+bomb5(there six chars): 
+			1st char: i/I/y/Y
+			2nd char:o/O/_
+			3rd char:n/N/^/~
+			4th char:e/E/u/U
+			5th char:f/F/v/V
+			6th char:g/G/w/W
+bomb6:4 3 2 1 6 5
