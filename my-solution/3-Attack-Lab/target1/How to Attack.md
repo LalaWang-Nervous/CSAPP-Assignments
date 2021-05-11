@@ -70,7 +70,7 @@ Dump of assembler code for function test:
 
 也就是说，当getbuf函数运行到retq这个语句时，应该让它返回至touch1()的地址，首先理解retq这个语句的含义：
 
-![image-20210506213903895](/home/lalawang/.config/Typora/typora-user-images/image-20210506213903895.png)
+![image-20210506213903895](/mnt/projects/CSAPP-Assignments/my-solution/3-Attack-Lab/target1/image-20210506213903895.png)
 
 函数在跳转前会将返回的地址压到栈顶，返回前会先将栈顶保存的地址弹出再跳转。因此，找到getbuf()函数存放返回地址的栈上的那个内存单元改变里面的值即可。
 
@@ -139,13 +139,13 @@ c0 17 40 00 00 00 00 00
 
 大部分电脑应该都是`little-endian`字节序，即低位在低地址，高位在高地址。
 
-![image-20210507101128729](/home/lalawang/.config/Typora/typora-user-images/image-20210507101128729.png)
+![image-20210507101128729](/mnt/projects/CSAPP-Assignments/my-solution/3-Attack-Lab/target1/image-20210507101128729.png)
 
 ```
 > ./hex2raw -i solutions/level1.txt | ./ctarget -q
 ```
 
-![image-20210506212326205](/home/lalawang/.config/Typora/typora-user-images/image-20210506212326205.png)
+![image-20210506212326205](/mnt/projects/CSAPP-Assignments/my-solution/3-Attack-Lab/target1/image-20210506212326205.png)
 
 
 
@@ -222,7 +222,7 @@ Disassembly of section .text:
 
 在getbuf中运行期间，栈结构如下图所示：
 
-![image-20210507114020706](/home/lalawang/.config/Typora/typora-user-images/image-20210507114020706.png)
+![image-20210507114020706](/mnt/projects/CSAPP-Assignments/my-solution/3-Attack-Lab/target1/image-20210507114020706.png)
 
 上图中，我们把自己注入的代码放到0x5561dc78中，那么在0x5561dca0处所存储的指就是0x5561dc78，这样getbuf()中retq语句执行后，我们自己的代码指令会被加载进%rip中开始执行，因此输入的字符串：
 
@@ -295,7 +295,7 @@ Disassembly of section .text:
 
 然后可得输入字符串内容：
 
-![image-20210507162732674](/home/lalawang/.config/Typora/typora-user-images/image-20210507162732674.png)
+![image-20210507162732674](/mnt/projects/CSAPP-Assignments/my-solution/3-Attack-Lab/target1/image-20210507162732674.png)
 
 输入文本：
 
@@ -316,7 +316,7 @@ Disassembly of section .text:
 
 来分析一下这个问题，由于rtarget中加入了栈地址随机化和栈内存不可执行的干扰，无法再像task2那样明文把栈地址作为字符串内容输入进去；并且，为了实现攻击，代码的逻辑上必然是两个过程，第一，%rdi寄存器中的值变成cookie，然后跳转到touch2()的地址；由于只能使用已有的机器指令序列，不可能刚好凑巧有一个popq %rdi 和 ret 挨到一起（这样的话直接在%rsp+48处放上cookie，在%rsp+40处放上那个凑巧代码指令的起始地址即可），因此需要周转一下，我们可以先把cookie的值pop到一个通用寄存器中，再将这个寄存器的值mov到 %rdi中，然后再ret到touch2()的地址里，基于这个思路，最终应该使得栈结构如下图所示：
 
-![image-20210508201346508](/home/lalawang/.config/Typora/typora-user-images/image-20210508201346508.png)
+![image-20210508201346508](/mnt/projects/CSAPP-Assignments/my-solution/3-Attack-Lab/target1/image-20210508201346508.png)
 
 当getbuf函数执行到ret（ret1）语句时，此时时刻为t1，此刻栈顶是rsp+40，在这个内存单元放上一个指令的起始地址，那么当retq语句生效后，此时栈顶变成rsp+48,也就是t2时刻，让接下来这段代码的语义为将栈顶元素pop至一个寄存器之中然后ret（ret2），暂时就定为%rax，那么当语句执行到ret(ret2)时，此时的栈顶又变成了%rsp+56,也就是t3时刻，此时执行ret(ret2)语句实际上就会跳转到%rsp+56中存储的指令地址上，也就是code address 2，我们让这一段指令的语义为%rax中的内容mov到%rdi中，那么当ret(ret2)生效之后此时栈顶会变成%rsp+64这个位置，让这个位置存储touch2()地址，直接ret(ret3)即可。
 
@@ -525,7 +525,7 @@ code2:
 
 code1起始地址是0x4019ab，code2起始地址是0x4019c5，那么栈上内容应该是：
 
-![image-20210508202910178](/home/lalawang/.config/Typora/typora-user-images/image-20210508202910178.png)
+![image-20210508202910178](/mnt/projects/CSAPP-Assignments/my-solution/3-Attack-Lab/target1/image-20210508202910178.png)
 
 因此输入的内容应该是：
 
@@ -543,5 +543,5 @@ ec 17 40 00 00 00 00 00
 
 测试：
 
-![image-20210508203038364](/home/lalawang/.config/Typora/typora-user-images/image-20210508203038364.png)
+![image-20210508203038364](/mnt/projects/CSAPP-Assignments/my-solution/3-Attack-Lab/target1/image-20210508203038364.png)
 
