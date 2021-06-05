@@ -83,40 +83,41 @@ int main(int argc, char **argv)
 
     while(fscanf(tracefile,"%s %x,%d",type,&address,&size) != EOF){
         if(strcmp(type,"I")==0)continue;
-        long int targetGroupIndex = (address & groupIndexMask) >> b;
+        long int targetGroupIndex = ((address & groupIndexMask) >> b) % groupNum;
         long int flag = (address & flagMask) >> (s + b);
         struct group *targetGroup = groups[targetGroupIndex];
         struct lineNode* pointer = targetGroup->dummyHead->next;
         while(pointer != targetGroup->dummyTail) {
-            if ((pointer->value->valid) && (pointer->value->flag == flag)) {
-                // hit
-                hit_count = hit_count + 1;
+            if (pointer->value->valid == false) {
+                // miss
+                miss_count = miss_count + 1;
+                if (strcmp(type, "M") == 0)hit_count = hit_count + 1;
+                pointer->value->flag = flag;
+                pointer->value->valid = true;
                 update(pointer, targetGroup->dummyHead);
                 if (v == 1) {
-                    printf("%s %x, %d hit\n",type,address,size);
+                    if (strcmp(type, "M") == 0) {
+                        printf("%s %x, %d miss hit\n", type, address, size);
+                    } else {
+                        printf("%s %x, %d miss\n", type, address, size);
+                    }
+
                 }
                 break;
             } else {
-                if (pointer->value->valid == false) {
-                    // miss
-                    miss_count = miss_count + 1;
-                    if (strcmp(type,"M")==0)hit_count = hit_count + 1;
-                    pointer->value->flag = flag;
-                    pointer->value->valid = true;
+                if (pointer->value->flag == flag) {
+                    // hit
+                    hit_count = hit_count + 1;
+                    if (strcmp(type, "M") == 0)hit_count = hit_count + 1;
                     update(pointer, targetGroup->dummyHead);
                     if (v == 1) {
-                        if (strcmp(type,"S")==0) {
-                            printf("%s %x, %d miss\n",type,address,size);
-                        } else {
-                            printf("%s %x, %d miss hit\n",type,address,size);
-                        }
+                        printf("%s %x, %d hit\n", type, address, size);
                     }
                     break;
                 } else {
                     pointer = pointer->next;
                 }
             }
-
         }
 
         if(pointer == targetGroup->dummyTail) {
@@ -128,10 +129,10 @@ int main(int argc, char **argv)
             }
 
             if(v==1) {
-                if(strcmp(type,"S")==0){
-                    printf("%s %x, %d miss eviction\n",type,address,size);
-                } else {
+                if(strcmp(type,"M")==0){
                     printf("%s %x, %d miss eviction hit\n",type,address,size);
+                } else {
+                    printf("%s %x, %d miss eviction\n",type,address,size);
                 }
             }
             pointer = pointer->prev;
