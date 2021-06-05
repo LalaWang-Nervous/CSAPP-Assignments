@@ -7,25 +7,19 @@
 #include <stdbool.h>
 #include <string.h>
 
-struct line {
+struct lineNode {
+    struct lineNode *prev;
+    struct lineNode *next;
     bool valid;
     long int flag;
 };
 
-struct lineNode {
-    struct lineNode *prev;
-    struct lineNode *next;
-    struct line *value;
-};
-
-struct group
-{
-    int validLineNum;
+struct group {
     struct lineNode* dummyHead;
     struct lineNode* dummyTail;
 };
 
-void update(struct  lineNode* node, struct lineNode* head){
+void moveToFirst(struct  lineNode* node, struct lineNode* head){
     node->next->prev = node->prev;
     node->prev->next = node->next;
     node->next = head->next;
@@ -36,65 +30,51 @@ void update(struct  lineNode* node, struct lineNode* head){
 
 void printHelp();
 void getOpt(int argc, char **argv, int *v, int *s, int *E, int *b, char **path);
+void init(int groupNum, struct group *groups[]);
 
+int v=0,s=0,E=0,b=0;
+char *path = NULL;
+int hit_count=0, miss_count=0, eviction_count=0;
 int main(int argc, char **argv)
 {
-    int v=0,s=0,E=0,b=0;
-    char *path = NULL;
-    int hit_count=0, miss_count=0, eviction_count=0;
+    // 1-read the command line parameters.
     getOpt(argc,argv,&v,&s,&E,&b,&path);
-
-    // -----------------
+    // 2-get the parameters for cache
     int groupNum = pow(2,s);
     long int groupIndexMask = (-1 >> (64 -s)) << b;
     long int flagMask = (-1 >> (s + b)) << (s + b);
-
+    // 3-create cache and initialize, groups are organized as array and
+    // the lines in group are organized as Linked list to apply LRU
     struct group *groups[groupNum];
-    for(int groupIndex=0;groupIndex<groupNum;groupIndex++){
-        struct group *thisGroup= (struct group *)malloc(sizeof(struct group));
-        thisGroup->dummyHead = (struct lineNode *) malloc(sizeof(struct lineNode));
-        thisGroup->dummyTail = (struct lineNode *) malloc(sizeof(struct lineNode));
-        thisGroup->dummyHead->next = thisGroup->dummyTail;
-        thisGroup->dummyTail->prev = thisGroup->dummyHead;
-        thisGroup->dummyHead->prev = NULL;
-        thisGroup->dummyTail->next = NULL;
-        thisGroup->validLineNum = E;
-        for(int lineIndex=0;lineIndex<E;lineIndex++){
-            struct line *thisLine = (struct line *)malloc(sizeof(struct line));
-            thisLine->valid = false;
-            thisLine->flag = 0;
-            //create linkNode
-            struct lineNode *thisLineNode = (struct lineNode *) malloc(sizeof(struct lineNode));
-            thisLineNode->value = thisLine;
-            // insert into the link
-            thisLineNode->next = thisGroup->dummyHead->next;
-            thisGroup->dummyHead->next->prev = thisLineNode;
-            thisGroup->dummyHead->next = thisLineNode;
-            thisLineNode->prev = thisGroup->dummyHead;
-        }
-        groups[groupIndex] = thisGroup;
-    }
+    init(groupNum, groups);
 
-    // -----------------
+    // 4-handle the instructions
     unsigned int address;
     char type[10];
     int size;
     FILE *tracefile = fopen(path,"r");
-
     while(fscanf(tracefile,"%s %x,%d",type,&address,&size) != EOF){
-        if(strcmp(type,"I")==0)continue;
+        if(strcmp(type,"I")==0){   // ignore the intruction load.
+            continue;
+        }
+
+        // first get the group index and flag by this address (if cache exists)
         long int targetGroupIndex = ((address & groupIndexMask) >> b) % groupNum;
         long int flag = (address & flagMask) >> (s + b);
         struct group *targetGroup = groups[targetGroupIndex];
         struct lineNode* pointer = targetGroup->dummyHead->next;
+        // search the linked list from head
         while(pointer != targetGroup->dummyTail) {
-            if (pointer->value->valid == false) {
+            if (pointer->valid == false) {
+                // if find a invalid lineNode, means miss, and there still empty line
                 // miss
                 miss_count = miss_count + 1;
+                // Modify = load + save, will hit at the save operation
                 if (strcmp(type, "M") == 0)hit_count = hit_count + 1;
-                pointer->value->flag = flag;
-                pointer->value->valid = true;
-                update(pointer, targetGroup->dummyHead);
+                // write an empty line and move it to first
+                pointer->flag = flag;
+                pointer->valid = true;
+                moveToFirst(pointer, targetGroup->dummyHead);
                 if (v == 1) {
                     if (strcmp(type, "M") == 0) {
                         printf("%s %x, %d miss hit\n", type, address, size);
@@ -105,21 +85,25 @@ int main(int argc, char **argv)
                 }
                 break;
             } else {
-                if (pointer->value->flag == flag) {
+                if (pointer->flag == flag) {
+                    // if find a same flag, means hit
                     // hit
                     hit_count = hit_count + 1;
                     if (strcmp(type, "M") == 0)hit_count = hit_count + 1;
-                    update(pointer, targetGroup->dummyHead);
+                    moveToFirst(pointer, targetGroup->dummyHead);
                     if (v == 1) {
                         printf("%s %x, %d hit\n", type, address, size);
                     }
                     break;
                 } else {
+                    // find a valid line but not match, so find next line
                     pointer = pointer->next;
                 }
             }
         }
 
+        // if find to the dummyTail, means this group is full but target address not cached
+        // so find the last one lineNode to replace
         if(pointer == targetGroup->dummyTail) {
             // eviction
             miss_count = miss_count + 1;
@@ -136,13 +120,12 @@ int main(int argc, char **argv)
                 }
             }
             pointer = pointer->prev;
-            pointer->value->flag = flag;
-            update(pointer, targetGroup->dummyHead);
+            pointer->flag = flag;
+            moveToFirst(pointer, targetGroup->dummyHead);
         }
     }
     fclose(tracefile);
     free(path);
-
     printSummary(hit_count, miss_count, eviction_count);
     return 0;
 }
@@ -191,6 +174,29 @@ void getOpt(int argc, char **argv, int *v, int *s, int *E, int *b, char **path) 
             default:
                 exit(EXIT_FAILURE);
         }
+    }
+}
+
+void init(int groupNum, struct group *groups[]) {
+    for(int groupIndex=0;groupIndex<groupNum;groupIndex++){
+        struct group *thisGroup= (struct group *)malloc(sizeof(struct group));
+        thisGroup->dummyHead = (struct lineNode *) malloc(sizeof(struct lineNode));
+        thisGroup->dummyTail = (struct lineNode *) malloc(sizeof(struct lineNode));
+        thisGroup->dummyHead->next = thisGroup->dummyTail;
+        thisGroup->dummyTail->prev = thisGroup->dummyHead;
+        thisGroup->dummyHead->prev = NULL;
+        thisGroup->dummyTail->next = NULL;
+        for(int lineIndex=0;lineIndex<E;lineIndex++){
+            struct lineNode *thisLineNode = (struct lineNode *)malloc(sizeof(struct lineNode));
+            thisLineNode->valid = false;
+            thisLineNode->flag = 0;
+            // insert into the link
+            thisLineNode->next = thisGroup->dummyHead->next;
+            thisGroup->dummyHead->next->prev = thisLineNode;
+            thisGroup->dummyHead->next = thisLineNode;
+            thisLineNode->prev = thisGroup->dummyHead;
+        }
+        groups[groupIndex] = thisGroup;
     }
 }
 
