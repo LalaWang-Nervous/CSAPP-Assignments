@@ -53,6 +53,11 @@ void transpose_submit_32(int M, int N, int A[N][M], int B[M][N])
     }
 }
 
+
+/*
+ * 64, 61' solution:
+ * https://yangtau.me/computer-system/csapp-cache.html#64-x-64
+ * */
 char transpose_submit_desc_64[] = "Transpose submission 64";
 void transpose_submit_64(int M, int N, int A[N][M], int B[M][N])
 {
