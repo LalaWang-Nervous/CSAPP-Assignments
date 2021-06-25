@@ -26,7 +26,7 @@ extern void registerFunctions();
 volatile char MARKER_START, MARKER_END;
 
 static int A[256][256];
-static int B[256][256];
+static int B[256][256];  /*LalaWang's comment, these two declaration is very important, it determines that the matrix A and B's address mode*/
 static int M;
 static int N;
 
